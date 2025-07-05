@@ -1,0 +1,50 @@
+<%- include("partials/header-unlogined.ejs") %>
+        <% if (typeof error !== "undefined" && error) { %>
+            <div class="error-block"><%= error %></div>
+        <% } %>
+        <% if (typeof link !== "undefined" && link) { %>
+            <div class="success-block">
+                <span>Jelszó visszaállító link:</span><br>
+                <a href="<%= link %>" target="_blank"><%= link %></a>
+            </div>
+        <% } %>
+        <% if (typeof success !== "undefined" && success) { %>
+            <div class="success-block">
+                <p><%= success %></p>
+            </div>
+        <% } %>
+        <main>
+            <div class="container d-flex flex-wrap align-items-center justify-content-center form-box mb-5">
+                <div class="d-flex flex-wrap flex-column align-items-center justify-content-center login">
+                    <form action="/login" method="post" class="d-flex flex-wrap flex-column align-items-center justify-content-center mb-3">
+                        <h1 class="form-tex">SealMTA</h1>
+                        <input type="text" placeholder="Felhasználónév" class="form-input login-input" name="loginUser">
+                        <input type="password" placeholder="Jelszó" class="form-input login-input" name="loginPass">
+                        <a href="#" class="password-reminder password-reminder-login">Elfelejtett jelszó?</a>
+                        <div class="d-flex button-form">
+                            <button class="btn bg-sign form-login mx-2" type="submit">Bejelentkezés</button>
+                        </div>
+                    </form>
+                    <p class="register-to">Nincs fiókod? <a href="#" class="register-button">Regisztrálj most!</a></p>
+                </div>
+                <div class="d-flex flex-wrap flex-column align-items-center justify-content-center register">
+                    <form action="/register" method="post" class="d-flex flex-wrap flex-column align-items-center justify-content-center">
+                        <h1 class="form-tex">SealMTA</h1>
+                        <input type="text" placeholder="Felhasználónév" class="form-input register-input" name="registerUser">
+                        <input type="email" placeholder="Email" class="form-input register-input" name="registerEmail">
+                        <input type="password" placeholder="Jelszó" class="form-input register-input" name="registerPass">
+                        <a href="#" class="password-reminder password-reminder-register">Elfelejtett jelszó?</a>
+                        <button class="btn bg-sign form-register" type="submit">Fiók létrehozása</button>
+                    </form>
+                </div>
+                <div class="d-flex flex-wrap flex-column align-items-center justify-content-center reminder">
+                    <form action="/forgot-password" method="post" class="d-flex flex-wrap flex-column align-items-center justify-content-center">
+                        <h1 class="form-tex">SealMTA</h1>
+                        <input type="email" placeholder="Email" class="form-input register-input" name="forgotPasswordEmail">
+                        <a href="#" class="password-reminder back-to-login">Mégsem</a>
+                        <button class="btn bg-sign form-register" type="submit">Jelszó visszaállítása</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+<%- include("partials/footer.ejs") %>

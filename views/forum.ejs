@@ -1,0 +1,202 @@
+<%- include("partials/header-logged.ejs") %>
+
+<div class="category-filter">
+  <select onchange="filterByCategory(this.value)">
+    <option value="">Összes kategória</option>
+    <% categories.forEach(category => { %>
+      <option value="<%= category.id %>" <%= selectedCategory == category.id ? 'selected' : '' %>>
+        <%= category.name %>
+      </option>
+    <% }); %>
+  </select>
+</div>
+
+<!-- Téma létrehozás gomb - csak jogosult felhasználóknak -->
+<% if (canCreateMainThreads) { %>
+  <button class="create-thread-btn" onclick="openCreateModal()">
+    Új főtéma létrehozása
+  </button>
+<% } %>
+
+<!-- Témák listája -->
+<div class="thread-list mb-3">
+  <% if (threads && threads.length > 0) { %>
+    <% threads.forEach(thread => { %>
+      <div class="thread-item">
+        <div class="thread-info">
+          <a href="/thread/<%= thread.id %>" class="thread-title">
+            <%= thread.title %>
+          </a>
+          <div class="thread-meta">
+            <span>Szerző: <%= thread.author %></span>
+            <span>| <%= new Date(thread.created_at).toLocaleDateString('hu-HU') %></span>
+            <% if (thread.category_name) { %>
+              <span class="thread-category"><%= thread.category_name %></span>
+            <% } %>
+          </div>
+          <% if (thread.description) { %>
+            <p style="margin-top: 5px; color: #666; font-size: 14px;">
+              <%= thread.description.substring(0, 100) %>...
+            </p>
+          <% } %>
+        </div>
+        
+        <!-- Törlés gomb - admin vagy jogosult felhasználóknak -->
+        <% if (isAdmin || canCreateMainThreads) { %>
+          <div class="thread-actions">
+            <button class="delete-thread-btn" onclick="deleteThread(<%= thread.id %>)" title="Téma törlése">
+              🗑️
+            </button>
+          </div>
+        <% } %>
+      </div>
+    <% }); %>
+  <% } else { %>
+    <div class="no-threads">
+      Még nincsenek témák ebben a kategóriában.
+    </div>
+  <% } %>
+</div>
+
+<!-- Téma létrehozás modal - csak jogosult felhasználóknak -->
+<% if (canCreateMainThreads) { %>
+  <div id="createModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeCreateModal()">&times;</span>
+      <h2>Új főtéma létrehozása</h2>
+      <form id="createMainThreadForm">
+        <div class="form-group">
+          <label for="title">Téma címe:</label>
+          <input type="text" id="title" name="title" required>
+        </div>
+        <div class="form-group">
+          <label for="description">Leírás:</label>
+          <textarea id="description" name="description" placeholder="Rövid leírás a témáról..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="categoryId">Kategória:</label>
+          <select id="categoryId" name="categoryId" required>
+            <option value="">Válassz kategóriát</option>
+            <% categories.forEach(category => { %>
+              <option value="<%= category.id %>"><%= category.name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <button type="submit" class="submit-btn">Főtéma létrehozása</button>
+      </form>
+    </div>
+  </div>
+<% } %>
+
+<script>
+// Modal kezelés
+function openCreateModal() {
+  document.getElementById('createModal').style.display = 'block';
+}
+
+function closeCreateModal() {
+  document.getElementById('createModal').style.display = 'none';
+}
+
+// Kategória szűrés
+function filterByCategory(categoryId) {
+  if (categoryId === '') {
+    window.location.href = '/forum';
+  } else {
+    window.location.href = `/forum/category/${categoryId}`;
+  }
+}
+
+// Főtéma létrehozás
+<% if (canCreateMainThreads) { %>
+document.getElementById('createMainThreadForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const formData = new FormData(this);
+  const data = {
+    title: formData.get('title'),
+    description: formData.get('description'),
+    categoryId: formData.get('categoryId')
+  };
+
+  try {
+    const response = await fetch('/create-main-thread', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      alert('Főtéma sikeresen létrehozva!');
+      window.location.reload();
+    } else {
+      alert('Hiba: ' + result.error);
+    }
+  } catch (error) {
+    console.error('Hiba:', error);
+    alert('Hiba történt a téma létrehozásakor.');
+  }
+});
+<% } %>
+
+// Téma törlés
+<% if (isAdmin || canCreateMainThreads) { %>
+async function deleteThread(threadId) {
+  if (confirm('Biztosan törölni szeretnéd ezt a témát? Ez a művelet nem visszavonható és az összes altémát is törli!')) {
+    try {
+      const response = await fetch(`/delete-thread/${threadId}`, {
+        method: 'DELETE'
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('Téma sikeresen törölve!');
+        window.location.reload();
+      } else {
+        alert('Hiba: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Hiba:', error);
+      alert('Hiba történt a téma törlése során.');
+    }
+  }
+}
+<% } %>
+
+// Modal bezárás kattintásra
+window.onclick = function(event) {
+  const modal = document.getElementById('createModal');
+  if (event.target == modal) {
+    closeCreateModal();
+  }
+}
+</script>
+
+<style>
+
+.thread-actions {
+  margin-left: 15px;
+}
+
+.delete-thread-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 3px;
+  transition: background-color 0.3s;
+}
+
+.delete-thread-btn:hover {
+  background-color: #ff4444;
+  color: white;
+}
+</style>
+
+<%- include("partials/footer.ejs") %>

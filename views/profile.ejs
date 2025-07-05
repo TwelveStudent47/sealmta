@@ -1,0 +1,141 @@
+<%- include("partials/header-logged.ejs") %>
+
+        <main>
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title mb-0">
+                                <i class="ri-user-line me-2"></i>
+                                Profil
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <!-- Visszajelzés üzenetek -->
+                            <% if (success) { %>
+                                <div class="alert alert-success" role="alert">
+                                    <i class="ri-check-circle-line me-2"></i>
+                                    <%= success %>
+                                </div>
+                            <% } %>
+                            
+                            <% if (error) { %>
+                                <div class="alert alert-danger" role="alert">
+                                    <i class="ri-error-warning-line me-2"></i>
+                                    <%= error %>
+                                </div>
+                            <% } %>
+
+                            <!-- Felhasználó információk -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="ri-information-line me-2"></i>
+                                                Felhasználói adatok
+                                            </h5>
+                                            <p class="card-text">
+                                                <strong>Felhasználónév:</strong> <%= user.username %><br>
+                                                <strong>Email:</strong> <%= user.email %><br>
+                                                <strong>Regisztráció:</strong> <%= new Date(user.created_at).toLocaleDateString('hu-HU') %>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="ri-chat-3-line me-2"></i>
+                                                Aktivitás
+                                            </h5>
+                                            <p class="card-text">
+                                                <strong>Létrehozott témák:</strong> <%= threadCount %><br>
+                                                <strong>Státusz:</strong> <span class="badge bg-success">Aktív</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Profil szerkesztés form -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="ri-edit-line me-2"></i>
+                                        Profil szerkesztése
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <form action="/profile/update" method="POST">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label for="newUsername" class="form-label">
+                                                        <i class="ri-user-line me-1"></i>
+                                                        Felhasználónév
+                                                    </label>
+                                                    <input type="text" class="form-control" id="newUsername" name="newUsername" 
+                                                           value="<%= user.username %>" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label for="newEmail" class="form-label">
+                                                        <i class="ri-mail-line me-1"></i>
+                                                        Email cím
+                                                    </label>
+                                                    <input type="email" class="form-control" id="newEmail" name="newEmail" 
+                                                           value="<%= user.email %>" required>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label for="currentPassword" class="form-label">
+                                                        <i class="ri-lock-line me-1"></i>
+                                                        Jelenlegi jelszó <span class="text-danger">*</span>
+                                                    </label>
+                                                    <input type="password" class="form-control" id="currentPassword" name="currentPassword" 
+                                                           placeholder="Jelenlegi jelszó" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label for="newPassword" class="form-label">
+                                                        <i class="ri-lock-2-line me-1"></i>
+                                                        Új jelszó <span class="text-muted">(opcionális)</span>
+                                                    </label>
+                                                    <input type="password" class="form-control" id="newPassword" name="newPassword" 
+                                                           placeholder="Új jelszó (ha szeretnéd megváltoztatni)">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="alert alert-info" role="alert">
+                                            <i class="ri-information-line me-2"></i>
+                                            <strong>Figyelem:</strong> A jelenlegi jelszó megadása kötelező minden változtatáshoz.
+                                        </div>
+
+                                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                            <a href="/forum" class="btn btn-secondary me-md-2">
+                                                <i class="ri-arrow-left-line me-1"></i>
+                                                Vissza a fórumhoz
+                                            </a>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="ri-save-line me-1"></i>
+                                                Változások mentése
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+<%- include("partials/footer.ejs") %>
