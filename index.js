@@ -7,17 +7,20 @@ import dotenv from "dotenv";
 import crypto from "crypto";
 import { error } from "console";
 import session from "express-session";
+import nodemailer from "nodemailer";
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 const saltRounds = 10;
-app.use(session({
-  secret: process.env.SESSION_SECRET || "your_secret_key",
-  resave: false,
-  saveUninitialized: false,
-}));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your_secret_key",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
 
 const db = new pg.Client({
   user: process.env.DB_USER,
@@ -30,67 +33,76 @@ db.connect();
 
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json()); // JSON támogatás hozzáadva
+app.use(bodyParser.json());
 app.use(express.static("public"));
 
-// Middleware a jogosultságok ellenőrzéséhez
 async function checkForumAdminPermission(req, res, next) {
   if (!req.session.username) {
     return res.redirect("/");
   }
-  
+
   try {
-    const userRes = await db.query('SELECT is_forum_admin FROM users WHERE username = $1', [req.session.username]);
-    
+    const userRes = await db.query(
+      "SELECT is_forum_admin FROM users WHERE username = $1",
+      [req.session.username]
+    );
+
     if (userRes.rows.length === 0 || !userRes.rows[0].is_forum_admin) {
-      return res.status(403).json({ error: 'Nincs jogosultságod ehhez a művelethez' });
+      return res
+        .status(403)
+        .json({ error: "Nincs jogosultságod ehhez a művelethez" });
     }
-    
+
     next();
   } catch (err) {
-    console.error('Adatbázis hiba:', err);
-    return res.status(500).json({ error: 'Szerver hiba' });
+    console.error("Adatbázis hiba:", err);
+    return res.status(500).json({ error: "Szerver hiba" });
   }
 }
 
-// Új middleware - főtéma létrehozás ellenőrzése
 async function checkMainThreadPermission(req, res, next) {
   if (!req.session.username) {
     return res.redirect("/");
   }
-  
+
   try {
-    const userRes = await db.query('SELECT can_create_main_threads FROM users WHERE username = $1', [req.session.username]);
-    
+    const userRes = await db.query(
+      "SELECT can_create_main_threads FROM users WHERE username = $1",
+      [req.session.username]
+    );
+
     if (userRes.rows.length === 0 || !userRes.rows[0].can_create_main_threads) {
-      return res.status(403).json({ error: 'Nincs jogosultságod főtémák létrehozásához' });
+      return res
+        .status(403)
+        .json({ error: "Nincs jogosultságod főtémák létrehozásához" });
     }
-    
+
     next();
   } catch (err) {
-    console.error('Adatbázis hiba:', err);
-    return res.status(500).json({ error: 'Szerver hiba' });
+    console.error("Adatbázis hiba:", err);
+    return res.status(500).json({ error: "Szerver hiba" });
   }
 }
 
-// Felhasználó jogosultságainak lekérése
 async function getUserPermissions(username) {
   try {
-    const userRes = await db.query('SELECT is_forum_admin, can_create_main_threads FROM users WHERE username = $1', [username]);
+    const userRes = await db.query(
+      "SELECT is_forum_admin, can_create_main_threads FROM users WHERE username = $1",
+      [username]
+    );
     if (userRes.rows.length > 0) {
       return {
         isAdmin: userRes.rows[0].is_forum_admin || false,
-        canCreateMainThreads: userRes.rows[0].can_create_main_threads || false
+        canCreateMainThreads: userRes.rows[0].can_create_main_threads || false,
       };
     }
     return { isAdmin: false, canCreateMainThreads: false };
   } catch (err) {
-    console.error('Hiba a jogosultságok lekérésénél:', err);
+    console.error("Hiba a jogosultságok lekérésénél:", err);
     return { isAdmin: false, canCreateMainThreads: false };
   }
 }
 
-// Backward compatibility - régi függvény megtartása
 async function getUserAdminStatus(username) {
   const permissions = await getUserPermissions(username);
   return permissions.isAdmin;
@@ -101,9 +113,27 @@ app.get("/", (req, res) => {
 });
 
 app.post("/register", async (req, res) => {
-  const { registerUser, registerPass, registerEmail } = req.body;
+  if (
+    req.body.registerUser == "" ||
+    req.body.registerPass == "" ||
+    req.body.registerEmail == ""
+  ) {
+    res.render("index.ejs", { error: "Hiba történt regisztráció közben." });
+  } else {
+    const { registerUser, registerPass, registerEmail } = req.body;
+    const otpPassword = Math.floor(Math.random() * 999999);
 
-  try {
+    req.session.registrationData = {
+      registerUser,
+      registerPass,
+      registerEmail,
+      otpPassword
+    };
+
+    res.redirect("/otp");
+  }
+
+  /* try {
     const hashedPassword = await bcrypt.hash(registerPass, saltRounds);
 
     await db.query(
@@ -111,69 +141,121 @@ app.post("/register", async (req, res) => {
       [registerUser, registerEmail, hashedPassword]
     );
 
-    res.render("index.ejs", {success: "Sikeres regisztráció!"});
+    res.render("index.ejs", { success: "Sikeres regisztráció!" });
   } catch (err) {
     console.error(err);
-    res.render("index.ejs", {error: "Hiba történt regisztráció közben."});
+    res.render("index.ejs", { error: "Hiba történt regisztráció közben." });
+  } */
+});
+
+app.get("/otp", async (req, res) => {
+  if (!req.session.registrationData) {
+    return res.redirect("/register");
   }
+  
+  const { registerUser, registerPass, registerEmail, otpPassword } = req.session.registrationData;
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "sealmta4@gmail.com",
+      pass: process.env.GOOGLE_APP_PASSWORD,
+    },
+  });
+  await transporter.verify();
+  console.log("Server is ready to take our messages");
+  (async () => {
+    try {
+      const info = await transporter.sendMail({
+        from: '"SealMTA" <sealmta4@gmail.com>',
+        to: registerEmail,
+        subject: "Sikeres regisztráció – Erősítsd meg fiókodat!",
+        html: "<h1>Kedves " + registerUser + "!</h1><br><p>Köszönjük, hogy regisztráltál a fórumunkra! A regisztráció véglegesítéséhez kérjük, használd az alábbi megerősítő kódot:</p><br><h3>" + otpPassword + "</h3><br><p>Ha nem Te kezdeményezted ezt a regisztrációt, kérjük, hagyd figyelmen kívül ezt az e-mailt.<br>Bármilyen kérdés esetén állunk rendelkezésedre!<br><br><p>Üdvözlettel:</p><br><h3>A SealMTA csapata</h3><br><p>sealmta4@gmail.com</p><br><p>sealmta.hu</p>", 
+      });
+
+      console.log("Message sent: %s", info.messageId);
+      console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+      res.send("<h1>Sikeres</h1>");
+    } catch (err) {
+      console.error("Error while sending mail", err);
+      res.send("<h1>Sikertelen próbálkozás</h1>");
+    }
+  })();
+});
+
+app.get("/test", (req,res) => {
+  res.render("otp.ejs");
 });
 
 app.post("/login", async (req, res) => {
   const { loginUser, loginPass } = req.body;
 
   try {
-    const result = await db.query("SELECT * FROM users WHERE username = $1", [loginUser]);
+    const result = await db.query("SELECT * FROM users WHERE username = $1", [
+      loginUser,
+    ]);
 
     if (result.rows.length === 0) {
-      return res.render("index.ejs", {error : "Nincs ilyen felhasználó."});
+      return res.render("index.ejs", { error: "Nincs ilyen felhasználó." });
     }
 
     const user = result.rows[0];
     const passwordMatch = await bcrypt.compare(loginPass, user.password_hash);
 
     if (passwordMatch) {
-      const token = jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, {
-        expiresIn: "2h",
-      });
+      const token = jwt.sign(
+        { id: user.id, username: user.username },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: "2h",
+        }
+      );
       req.session.username = user.username;
       req.session.userId = user.id;
       res.redirect("/forum");
     } else {
-      res.render("index.ejs", {error : "Hibás jelszó."});
+      res.render("index.ejs", { error: "Hibás jelszó." });
     }
   } catch (err) {
     console.error(err);
-    res.render("index.ejs", {error : "Hiba történt bejelentkezés közben."});
+    res.render("index.ejs", { error: "Hiba történt bejelentkezés közben." });
   }
 });
 
 app.post("/forgot-password", async (req, res) => {
-    const email = req.body.forgotPasswordEmail;
-    try {
-        const user = await db.query("SELECT * FROM users WHERE email = $1", [email]);
-        if (user.rows.length === 0) {
-        return res.render("index.ejs", {error : "Nincs ilyen email cím."});
-        }
-
-        const token = crypto.randomBytes(32).toString("hex");
-
-        await db.query("UPDATE users SET reset_token = $1 WHERE email = $2", [token, email]);
-
-        const resetLink = `http://localhost:${port}/reset-password/${token}`;
-        res.render("index.ejs", { link : resetLink});
-    } catch (err) {
-        console.error(err);
-        res.render("index.ejs", {error : "Hiba történt."});
+  const email = req.body.forgotPasswordEmail;
+  try {
+    const user = await db.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    if (user.rows.length === 0) {
+      return res.render("index.ejs", { error: "Nincs ilyen email cím." });
     }
+
+    const token = crypto.randomBytes(32).toString("hex");
+
+    await db.query("UPDATE users SET reset_token = $1 WHERE email = $2", [
+      token,
+      email,
+    ]);
+
+    const resetLink = `http://localhost:${port}/reset-password/${token}`;
+    res.render("index.ejs", { link: resetLink });
+  } catch (err) {
+    console.error(err);
+    res.render("index.ejs", { error: "Hiba történt." });
+  }
 });
 
 app.get("/reset-password/:token", async (req, res) => {
   const { token } = req.params;
 
-  const user = await db.query("SELECT * FROM users WHERE reset_token = $1", [token]);
+  const user = await db.query("SELECT * FROM users WHERE reset_token = $1", [
+    token,
+  ]);
 
   if (user.rows.length === 0) {
-    return res.render("index.ejs", {error : "Érvénytelen vagy lejárt token."});
+    return res.render("index.ejs", { error: "Érvénytelen vagy lejárt token." });
   }
 
   res.render("reset-password.ejs", { token });
@@ -184,27 +266,28 @@ app.post("/reset-password/:token", async (req, res) => {
   const { newPassword } = req.body;
 
   try {
-    const user = await db.query("SELECT * FROM users WHERE reset_token = $1", [token]);
+    const user = await db.query("SELECT * FROM users WHERE reset_token = $1", [
+      token,
+    ]);
 
     if (user.rows.length === 0) {
-      return res.render("index.ejs", {error : "Érvénytelen token."});
+      return res.render("index.ejs", { error: "Érvénytelen token." });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-    await db.query("UPDATE users SET password_hash = $1, reset_token = NULL WHERE reset_token = $2", [
-      hashedPassword,
-      token,
-    ]);
+    await db.query(
+      "UPDATE users SET password_hash = $1, reset_token = NULL WHERE reset_token = $2",
+      [hashedPassword, token]
+    );
 
-    res.render("index.ejs", {success : "Sikeresen megváltozott a jelszó."});
+    res.render("index.ejs", { success: "Sikeresen megváltozott a jelszó." });
   } catch (err) {
     console.error(err);
-    res.render("index.ejs", {error : "Hiba történt jelszó módosításkor."});
+    res.render("index.ejs", { error: "Hiba történt jelszó módosításkor." });
   }
 });
 
-// Hierarchikus témák lekérése
 async function getThreadsHierarchy(categoryId = null, parentId = null) {
   let query = `
     SELECT t.*, c.name as category_name 
@@ -213,34 +296,36 @@ async function getThreadsHierarchy(categoryId = null, parentId = null) {
     WHERE 1=1
   `;
   let params = [];
-  
+
   if (categoryId) {
     query += ` AND t.category_id = $${params.length + 1}`;
     params.push(categoryId);
   }
-  
+
   if (parentId) {
     query += ` AND t.parent_id = $${params.length + 1}`;
     params.push(parentId);
   } else {
     query += ` AND t.parent_id IS NULL`;
   }
-  
+
   query += ` ORDER BY t.created_at DESC`;
-  
+
   const result = await db.query(query, params);
   return result.rows;
 }
 
-// Altémák lekérése
 async function getSubthreads(parentId) {
-  const result = await db.query(`
+  const result = await db.query(
+    `
     SELECT t.*, c.name as category_name 
     FROM threads t
     LEFT JOIN categories c ON t.category_id = c.id
     WHERE t.parent_id = $1
     ORDER BY t.created_at DESC
-  `, [parentId]);
+  `,
+    [parentId]
+  );
   return result.rows;
 }
 
@@ -248,61 +333,62 @@ app.get("/forum", async (req, res) => {
   if (!req.session.username) {
     return res.redirect("/");
   }
-  
+
   try {
-    const categoriesRes = await db.query(`SELECT * FROM categories ORDER BY id`);
+    const categoriesRes = await db.query(
+      `SELECT * FROM categories ORDER BY id`
+    );
     const categories = categoriesRes.rows;
 
     const threads = await getThreadsHierarchy();
-    
-    // Felhasználó jogosultságainak lekérése
+
     const permissions = await getUserPermissions(req.session.username);
 
-    res.render("forum.ejs", { 
-      categories, 
-      threads, 
+    res.render("forum.ejs", {
+      categories,
+      threads,
       details: { username: req.session.username },
       selectedCategory: null,
       isAdmin: permissions.isAdmin,
-      canCreateMainThreads: permissions.canCreateMainThreads
+      canCreateMainThreads: permissions.canCreateMainThreads,
     });
   } catch (err) {
     console.error(err);
-    res.render("forum.ejs", { 
-      categories: [], 
-      threads: [], 
+    res.render("forum.ejs", {
+      categories: [],
+      threads: [],
       details: { username: req.session.username },
       selectedCategory: null,
       isAdmin: false,
       canCreateMainThreads: false,
-      error: "Hiba történt a fórum betöltésekor."
+      error: "Hiba történt a fórum betöltésekor.",
     });
   }
 });
 
-// Kategória szűrés
 app.get("/forum/category/:id", async (req, res) => {
   if (!req.session.username) {
     return res.redirect("/");
   }
-  
+
   const categoryId = req.params.id;
   try {
-    const categoriesRes = await db.query(`SELECT * FROM categories ORDER BY id`);
+    const categoriesRes = await db.query(
+      `SELECT * FROM categories ORDER BY id`
+    );
     const categories = categoriesRes.rows;
 
     const threads = await getThreadsHierarchy(categoryId);
-    
-    // Felhasználó jogosultságainak lekérése
+
     const permissions = await getUserPermissions(req.session.username);
 
-    res.render("forum.ejs", { 
-      categories, 
-      threads, 
+    res.render("forum.ejs", {
+      categories,
+      threads,
       details: { username: req.session.username },
       selectedCategory: categoryId,
       isAdmin: permissions.isAdmin,
-      canCreateMainThreads: permissions.canCreateMainThreads
+      canCreateMainThreads: permissions.canCreateMainThreads,
     });
   } catch (err) {
     console.error(err);
@@ -310,12 +396,11 @@ app.get("/forum/category/:id", async (req, res) => {
   }
 });
 
-// Főtéma létrehozása - csak jogosult felhasználók
 app.post("/create-main-thread", checkMainThreadPermission, async (req, res) => {
   const { title, description, categoryId } = req.body;
-  
+
   if (!title || !description || !categoryId) {
-    return res.status(400).json({ error: 'Minden mező kötelező' });
+    return res.status(400).json({ error: "Minden mező kötelező" });
   }
 
   try {
@@ -327,14 +412,13 @@ app.post("/create-main-thread", checkMainThreadPermission, async (req, res) => {
     res.json({ success: true, threadId: result.rows[0].id });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Hiba történt a téma létrehozásakor' });
+    res.status(500).json({ error: "Hiba történt a téma létrehozásakor" });
   }
 });
 
-// Altéma létrehozása - bárki (ez marad változatlan)
 app.post("/create-thread", async (req, res) => {
   const { title, description, categoryId, parentId } = req.body;
-  
+
   if (!req.session.username) {
     return res.redirect("/");
   }
@@ -342,9 +426,12 @@ app.post("/create-thread", async (req, res) => {
   try {
     let level = 0;
     let finalCategoryId = categoryId;
-    
+
     if (parentId) {
-      const parentRes = await db.query("SELECT level, category_id FROM threads WHERE id = $1", [parentId]);
+      const parentRes = await db.query(
+        "SELECT level, category_id FROM threads WHERE id = $1",
+        [parentId]
+      );
       if (parentRes.rows.length > 0) {
         level = parentRes.rows[0].level + 1;
         finalCategoryId = parentRes.rows[0].category_id;
@@ -353,7 +440,14 @@ app.post("/create-thread", async (req, res) => {
 
     await db.query(
       "INSERT INTO threads (title, description, category_id, parent_id, author, level) VALUES ($1, $2, $3, $4, $5, $6)",
-      [title, description, finalCategoryId, parentId || null, req.session.username, level]
+      [
+        title,
+        description,
+        finalCategoryId,
+        parentId || null,
+        req.session.username,
+        level,
+      ]
     );
 
     if (parentId) {
@@ -367,56 +461,59 @@ app.post("/create-thread", async (req, res) => {
   }
 });
 
-// Téma törlése - admin vagy jogosult felhasználó
 app.delete("/delete-thread/:id", async (req, res) => {
   const threadId = req.params.id;
-  
+
   if (!req.session.username) {
-    return res.status(403).json({ error: 'Nincs jogosultságod ehhez a művelethez' });
+    return res
+      .status(403)
+      .json({ error: "Nincs jogosultságod ehhez a művelethez" });
   }
 
   try {
     const permissions = await getUserPermissions(req.session.username);
-    
+
     if (!permissions.isAdmin && !permissions.canCreateMainThreads) {
-      return res.status(403).json({ error: 'Nincs jogosultságod témák törléséhez' });
+      return res
+        .status(403)
+        .json({ error: "Nincs jogosultságod témák törléséhez" });
     }
-    
-    // Először töröljük az összes altémát rekurzívan
+
     await deleteThreadRecursively(threadId);
-    
+
     res.json({ success: true });
   } catch (err) {
-    console.error('Hiba a téma törlésénél:', err);
-    res.status(500).json({ error: 'Hiba történt a téma törlésénél' });
+    console.error("Hiba a téma törlésénél:", err);
+    res.status(500).json({ error: "Hiba történt a téma törlésénél" });
   }
 });
 
-// Rekurzív törlés segédfüggvény
 async function deleteThreadRecursively(threadId) {
-  // Altémák lekérése
-  const subthreadsRes = await db.query('SELECT id FROM threads WHERE parent_id = $1', [threadId]);
-  
-  // Altémák törlése rekurzívan
+  const subthreadsRes = await db.query(
+    "SELECT id FROM threads WHERE parent_id = $1",
+    [threadId]
+  );
+
   for (const subthread of subthreadsRes.rows) {
     await deleteThreadRecursively(subthread.id);
   }
-  
-  // Végül a téma törlése
-  await db.query('DELETE FROM threads WHERE id = $1', [threadId]);
+
+  await db.query("DELETE FROM threads WHERE id = $1", [threadId]);
 }
 
-// Téma részleteinek megtekintése
 app.get("/thread/:id", async (req, res) => {
   const threadId = req.params.id;
-  
+
   try {
-    const threadRes = await db.query(`
+    const threadRes = await db.query(
+      `
       SELECT t.*, c.name as category_name 
       FROM threads t
       LEFT JOIN categories c ON t.category_id = c.id
       WHERE t.id = $1
-    `, [threadId]);
+    `,
+      [threadId]
+    );
 
     if (threadRes.rows.length === 0) {
       return res.redirect("/forum");
@@ -424,16 +521,15 @@ app.get("/thread/:id", async (req, res) => {
 
     const thread = threadRes.rows[0];
     const subthreads = await getSubthreads(threadId);
-    
-    // Felhasználó jogosultságainak lekérése
+
     const permissions = await getUserPermissions(req.session.username);
 
-    res.render("thread.ejs", { 
-      thread, 
-      subthreads, 
+    res.render("thread.ejs", {
+      thread,
+      subthreads,
       details: { username: req.session.username },
       isAdmin: permissions.isAdmin,
-      canCreateMainThreads: permissions.canCreateMainThreads
+      canCreateMainThreads: permissions.canCreateMainThreads,
     });
   } catch (err) {
     console.error(err);
@@ -441,58 +537,64 @@ app.get("/thread/:id", async (req, res) => {
   }
 });
 
-// Főtéma létrehozási jogosultság beállítása
-app.post("/set-main-thread-permission/:userId", checkForumAdminPermission, async (req, res) => {
-  const targetUserId = req.params.userId;
-  const { canCreateMainThreads } = req.body;
-  
-  try {
-    await db.query(
-      'UPDATE users SET can_create_main_threads = $1 WHERE id = $2',
-      [canCreateMainThreads ? true : false, targetUserId]
-    );
-    
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Hiba a jogosultság beállításánál:', err);
-    res.status(500).json({ error: 'Hiba történt' });
-  }
-});
+app.post(
+  "/set-main-thread-permission/:userId",
+  checkForumAdminPermission,
+  async (req, res) => {
+    const targetUserId = req.params.userId;
+    const { canCreateMainThreads } = req.body;
 
-// Admin jogosultság beállítása (megtartva)
-app.post("/set-forum-admin/:userId", checkForumAdminPermission, async (req, res) => {
-  const targetUserId = req.params.userId;
-  const { isAdmin } = req.body;
-  
-  try {
-    await db.query(
-      'UPDATE users SET is_forum_admin = $1 WHERE id = $2',
-      [isAdmin ? true : false, targetUserId]
-    );
-    
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Hiba az admin jog beállításánál:', err);
-    res.status(500).json({ error: 'Hiba történt' });
-  }
-});
+    try {
+      await db.query(
+        "UPDATE users SET can_create_main_threads = $1 WHERE id = $2",
+        [canCreateMainThreads ? true : false, targetUserId]
+      );
 
-// Felhasználók listája admin joggal
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Hiba a jogosultság beállításánál:", err);
+      res.status(500).json({ error: "Hiba történt" });
+    }
+  }
+);
+
+app.post(
+  "/set-forum-admin/:userId",
+  checkForumAdminPermission,
+  async (req, res) => {
+    const targetUserId = req.params.userId;
+    const { isAdmin } = req.body;
+
+    try {
+      await db.query("UPDATE users SET is_forum_admin = $1 WHERE id = $2", [
+        isAdmin ? true : false,
+        targetUserId,
+      ]);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Hiba az admin jog beállításánál:", err);
+      res.status(500).json({ error: "Hiba történt" });
+    }
+  }
+);
+
 app.get("/admin/users", checkForumAdminPermission, async (req, res) => {
   try {
-    const usersRes = await db.query('SELECT id, username, email, is_forum_admin, can_create_main_threads, created_at FROM users ORDER BY username');
-    
+    const usersRes = await db.query(
+      "SELECT id, username, email, is_forum_admin, can_create_main_threads, created_at FROM users ORDER BY username"
+    );
+
     res.render("admin-users.ejs", {
       users: usersRes.rows,
-      details: { username: req.session.username }
+      details: { username: req.session.username },
     });
   } catch (err) {
-    console.error('Adatbázis hiba:', err);
-    res.status(500).send('Szerver hiba');
+    console.error("Adatbázis hiba:", err);
+    res.status(500).send("Szerver hiba");
   }
 });
 
-// Profile route - felhasználó adatainak megjelenítése
 app.get("/profile", async (req, res) => {
   if (!req.session.username) {
     return res.redirect("/");
@@ -509,8 +611,7 @@ app.get("/profile", async (req, res) => {
     }
 
     const user = userRes.rows[0];
-    
-    // Felhasználó által létrehozott témák számolása
+
     const threadCountRes = await db.query(
       "SELECT COUNT(*) as count FROM threads WHERE author = $1",
       [req.session.username]
@@ -523,7 +624,7 @@ app.get("/profile", async (req, res) => {
       threadCount,
       details: { username: req.session.username },
       success: null,
-      error: null
+      error: null,
     });
   } catch (err) {
     console.error(err);
@@ -531,7 +632,6 @@ app.get("/profile", async (req, res) => {
   }
 });
 
-// Profile adatok frissítése
 app.post("/profile/update", async (req, res) => {
   if (!req.session.username) {
     return res.redirect("/");
@@ -540,11 +640,9 @@ app.post("/profile/update", async (req, res) => {
   const { newUsername, newEmail, currentPassword, newPassword } = req.body;
 
   try {
-    // Jelenlegi felhasználó adatainak lekérése
-    const userRes = await db.query(
-      "SELECT * FROM users WHERE username = $1",
-      [req.session.username]
-    );
+    const userRes = await db.query("SELECT * FROM users WHERE username = $1", [
+      req.session.username,
+    ]);
 
     if (userRes.rows.length === 0) {
       return res.redirect("/");
@@ -552,8 +650,10 @@ app.post("/profile/update", async (req, res) => {
 
     const user = userRes.rows[0];
 
-    // Jelszó ellenőrzése
-    const passwordMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    const passwordMatch = await bcrypt.compare(
+      currentPassword,
+      user.password_hash
+    );
     if (!passwordMatch) {
       const threadCountRes = await db.query(
         "SELECT COUNT(*) as count FROM threads WHERE author = $1",
@@ -566,11 +666,10 @@ app.post("/profile/update", async (req, res) => {
         threadCount,
         details: { username: req.session.username },
         error: "Hibás jelenlegi jelszó.",
-        success: null
+        success: null,
       });
     }
 
-    // Ellenőrzés: van-e már ilyen felhasználónév (ha változik)
     if (newUsername !== user.username) {
       const existingUserRes = await db.query(
         "SELECT id FROM users WHERE username = $1 AND id != $2",
@@ -589,12 +688,11 @@ app.post("/profile/update", async (req, res) => {
           threadCount,
           details: { username: req.session.username },
           error: "Ez a felhasználónév már foglalt.",
-          success: null
+          success: null,
         });
       }
     }
 
-    // Ellenőrzés: van-e már ilyen email (ha változik)
     if (newEmail !== user.email) {
       const existingEmailRes = await db.query(
         "SELECT id FROM users WHERE email = $1 AND id != $2",
@@ -613,12 +711,11 @@ app.post("/profile/update", async (req, res) => {
           threadCount,
           details: { username: req.session.username },
           error: "Ez az email cím már használatban van.",
-          success: null
+          success: null,
         });
       }
     }
 
-    // Adatok frissítése
     let hashedPassword = user.password_hash;
     if (newPassword && newPassword.trim() !== "") {
       hashedPassword = await bcrypt.hash(newPassword, saltRounds);
@@ -629,16 +726,14 @@ app.post("/profile/update", async (req, res) => {
       [newUsername, newEmail, hashedPassword, user.id]
     );
 
-    // Ha a felhasználónév változott, frissítjük a témákat is
     if (newUsername !== user.username) {
-      await db.query(
-        "UPDATE threads SET author = $1 WHERE author = $2",
-        [newUsername, user.username]
-      );
+      await db.query("UPDATE threads SET author = $1 WHERE author = $2", [
+        newUsername,
+        user.username,
+      ]);
       req.session.username = newUsername;
     }
 
-    // Frissített adatok lekérése
     const updatedUserRes = await db.query(
       "SELECT id, username, email, created_at FROM users WHERE id = $1",
       [user.id]
@@ -658,9 +753,8 @@ app.post("/profile/update", async (req, res) => {
       threadCount,
       details: { username: req.session.username },
       success: "Profil sikeresen frissítve!",
-      error: null
+      error: null,
     });
-
   } catch (err) {
     console.error(err);
     const threadCountRes = await db.query(
@@ -679,15 +773,15 @@ app.post("/profile/update", async (req, res) => {
       threadCount,
       details: { username: req.session.username },
       error: "Hiba történt a profil frissítésekor.",
-      success: null
+      success: null,
     });
   }
 });
 
 app.get("/pp", (req, res) => {
-    res.render("pp.ejs", {
-        details: { username: req.session.username}
-    })
+  res.render("pp.ejs", {
+    details: { username: req.session.username },
+  });
 });
 
 app.post("/logout", (req, res) => {
@@ -700,7 +794,6 @@ app.post("/logout", (req, res) => {
   });
 });
 
-// Alternatív GET route is (ha valaki közvetlenül a linkre kattint)
 app.get("/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -711,6 +804,6 @@ app.get("/logout", (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+app.listen(3000, "0.0.0.0", () => {
+  console.log("Server running on port 3000");
 });

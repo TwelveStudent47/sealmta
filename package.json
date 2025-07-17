@@ -7,7 +7,9 @@
     "ejs": "^3.1.10",
     "express": "^5.1.0",
     "express-session": "^1.18.1",
+    "googleapis": "^153.0.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.5",
     "pg": "^8.16.3"
   },
   "name": "sealmta",
