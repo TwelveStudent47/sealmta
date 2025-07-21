@@ -806,7 +806,7 @@ body {
 }
 
 .otp-input {
-  width: 60px;
+  width: 500px;
   height: 60px;
   border: 2px solid #e9ecef;
   border-radius: 12px;
@@ -830,21 +830,43 @@ body {
   background: #f8fff9;
 }
 
-.otp-input.error {
-  border-color: #dc3545;
-  background: #fff5f5;
-  animation: shake 0.5s ease-in-out;
+#otpForm .submit-btn {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, var(--primary-color), #2ecc71);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
 }
 
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateX(0);
+#otpForm .submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+#otpForm .submit-btn:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+  .card-container {
+    padding: 30px 20px;
   }
-  25% {
-    transform: translateX(-5px);
+
+  .otp-input {
+    width: 250px;
+    height: 50px;
+    font-size: 20px;
   }
-  75% {
-    transform: translateX(5px);
+
+  .otp-container {
+    gap: 10px;
   }
 }

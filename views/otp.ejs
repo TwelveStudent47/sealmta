@@ -3,32 +3,21 @@
         <div class="d-flex min-vh-75 justify-content-center align-items-center">
             <div class="card-container">
                 <div class="icon">🔒</div>
-                <h1>OTP Ellenőrzés</h1>
+                <h1>Egyszeri Megerősítő Kód</h1>
                 <p class="subtitle">Kérjük, adja meg a 6 számjegyű kódot, amelyet elküldtünk az email címére.</p>
         
                 <div class="email-display">
-                    📧 test.felhasznalo@test.hu
+                    📧 <%= regEmail %>
                 </div>
 
                 <form id="otpForm" action="/verify-otp" method="POST">
                     <div class="otp-container">
-                        <input type="text" class="otp-input" maxlength="1" data-index="0">
-                        <input type="text" class="otp-input" maxlength="1" data-index="1">
-                        <input type="text" class="otp-input" maxlength="1" data-index="2">
-                        <input type="text" class="otp-input" maxlength="1" data-index="3">
-                        <input type="text" class="otp-input" maxlength="1" data-index="4">
-                        <input type="text" class="otp-input" maxlength="1" data-index="5">
+                        <input type="text" class="otp-input" name="otpInput" maxlength="6">
                     </div>
 
                     <input type="hidden" name="otpCode" id="otpCode">
-                    <button type="submit" class="submit-btn" id="submitBtn" disabled>Ellenőrzés</button>
+                    <button type="submit" class="submit-btn" id="submitBtn" >Ellenőrzés</button>
                 </form>
-
-                <div class="resend-container">
-                    <p class="resend-text">Nem kapta meg a kódot?</p>
-                    <button class="resend-btn" id="resendBtn">Újraküldés</button>
-                    <div class="timer" id="timer"></div>
-                </div>
             </div>
         </div>
     </main>

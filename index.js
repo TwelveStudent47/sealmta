@@ -132,20 +132,6 @@ app.post("/register", async (req, res) => {
 
     res.redirect("/otp");
   }
-
-  /* try {
-    const hashedPassword = await bcrypt.hash(registerPass, saltRounds);
-
-    await db.query(
-      "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)",
-      [registerUser, registerEmail, hashedPassword]
-    );
-
-    res.render("index.ejs", { success: "Sikeres regisztráció!" });
-  } catch (err) {
-    console.error(err);
-    res.render("index.ejs", { error: "Hiba történt regisztráció közben." });
-  } */
 });
 
 app.get("/otp", async (req, res) => {
@@ -175,16 +161,33 @@ app.get("/otp", async (req, res) => {
 
       console.log("Message sent: %s", info.messageId);
       console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-      res.send("<h1>Sikeres</h1>");
     } catch (err) {
       console.error("Error while sending mail", err);
-      res.send("<h1>Sikertelen próbálkozás</h1>");
     }
   })();
+  res.render("otp.ejs", {regEmail : registerEmail});
 });
 
-app.get("/test", (req,res) => {
-  res.render("otp.ejs");
+app.post("/verify-otp", async (req, res) => {
+  const { registerUser, registerPass, registerEmail, otpPassword } = req.session.registrationData;
+  const givenOtpPassword = req.body.otpInput;
+  if (givenOtpPassword == otpPassword) {
+    try {
+      const hashedPassword = await bcrypt.hash(registerPass, saltRounds);
+
+      await db.query(
+        "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)",
+        [registerUser, registerEmail, hashedPassword]
+      );
+
+      res.render("index.ejs", { success: "Sikeres regisztráció!" });
+    } catch (err) {
+      console.error(err);
+      res.render("index.ejs", { error: "Hiba történt regisztráció közben." });
+    }
+  } else {
+    res.render("index.ejs", { error : "Rossz kódot adtál meg."});
+  }
 });
 
 app.post("/login", async (req, res) => {
