@@ -34,10 +34,10 @@
               <span class="thread-category"><%= thread.category_name %></span>
             <% } %>
           </div>
-          <% if (thread.description) { %>
-            <p style="margin-top: 5px; color: #666; font-size: 14px;">
-              <%= thread.description.substring(0, 100) %>...
-            </p>
+          <% if (thread.description_html) { %>
+            <div class="thread-description markdown-content">
+              <%- thread.description_html %>
+            </div>
           <% } %>
         </div>
         
@@ -64,14 +64,44 @@
     <div class="modal-content">
       <span class="close" onclick="closeCreateModal()">&times;</span>
       <h2>Új főtéma létrehozása</h2>
+      
+      <!-- Markdown segédlet -->
+      <div class="markdown-help">
+        <details>
+          <summary>📝 Markdown formázás használata</summary>
+          <div class="markdown-guide">
+  <p><strong>**vastag szöveg**</strong> → <strong>vastag szöveg</strong></p>
+  <p><em>*dőlt szöveg*</em> → <em>dőlt szöveg</em></p>
+  <p><code>`kód`</code> → <code>kód</code></p>
+  <p># Nagy címsor</p>
+  <p>## Közepes címsor</p>
+  <p>- Lista elem</p>
+  <p>> Idézet</p>
+  <p>[Link szövege](https://example.com)</p>
+  <hr style="margin: 10px 0; border: 1px solid #ddd;">
+  <p><strong>Színes szöveg:</strong></p>
+  <p>{red}piros szöveg{/red} → <span class="color-red">piros szöveg</span></p>
+  <p>{blue}kék szöveg{/blue} → <span class="color-blue">kék szöveg</span></p>
+  <p>{green}zöld szöveg{/green} → <span class="color-green">zöld szöveg</span></p>
+  <p>{yellow}sárga szöveg{/yellow} → <span class="color-yellow">sárga szöveg</span></p>
+  <p>{purple}lila szöveg{/purple} → <span class="color-purple">lila szöveg</span></p>
+  <p>{orange}narancs szöveg{/orange} → <span class="color-orange">narancs szöveg</span></p>
+  <p>{pink}rózsaszín szöveg{/pink} → <span class="color-pink">rózsaszín szöveg</span></p>
+  <p>{gray}szürke szöveg{/gray} → <span class="color-gray">szürke szöveg</span></p>
+</div>
+        </details>
+      </div>
+      
       <form id="createMainThreadForm">
         <div class="form-group">
           <label for="title">Téma címe:</label>
           <input type="text" id="title" name="title" required>
         </div>
         <div class="form-group">
-          <label for="description">Leírás:</label>
-          <textarea id="description" name="description" placeholder="Rövid leírás a témáról..." required></textarea>
+          <label for="description">Leírás (Markdown támogatott):</label>
+          <textarea id="description" name="description" placeholder="Rövid leírás a témáról... 
+
+Használhatsz **vastag**, *dőlt* szöveget, és egyéb formázást!" required></textarea>
         </div>
         <div class="form-group">
           <label for="categoryId">Kategória:</label>
@@ -178,7 +208,6 @@ window.onclick = function(event) {
 </script>
 
 <style>
-
 .thread-actions {
   margin-left: 15px;
 }
@@ -197,6 +226,125 @@ window.onclick = function(event) {
   background-color: #ff4444;
   color: white;
 }
+
+/* Markdown tartalom stílusok */
+.markdown-content {
+  margin-top: 8px;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+  margin: 10px 0 5px 0;
+  color: #333;
+}
+
+.markdown-content h1 { font-size: 18px; }
+.markdown-content h2 { font-size: 16px; }
+.markdown-content h3 { font-size: 14px; }
+
+.markdown-content p {
+  margin: 5px 0;
+}
+
+.markdown-content strong {
+  font-weight: bold;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content code {
+  background-color: #f4f4f4;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 90%;
+}
+
+.markdown-content pre {
+  background-color: #f4f4f4;
+  padding: 10px;
+  border-radius: 3px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #ddd;
+  margin: 10px 0;
+  padding-left: 15px;
+  color: #666;
+}
+
+.markdown-content ul, .markdown-content ol {
+  margin: 5px 0 5px 20px;
+}
+
+.markdown-content a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+/* Markdown segédlet stílusok */
+.markdown-help {
+  margin-bottom: 15px;
+}
+
+.markdown-help summary {
+  cursor: pointer;
+  font-weight: bold;
+  color: var(--primary-color);
+  margin-bottom: 10px;
+}
+
+.markdown-guide {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 5px;
+  border-left: 4px solid var(--primary-color);
+  margin-top: 10px;
+}
+
+.markdown-guide p {
+  margin: 5px 0;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.thread-description {
+  max-height: 150px;
+  overflow: hidden;
+  position: relative;
+}
+
+.thread-description:after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(to bottom, transparent, white);
+}
+
+.color-red { color: #dc3545; font-weight: 500; }
+.color-blue { color: #007bff; font-weight: 500; }
+.color-green { color: #28a745; font-weight: 500; }
+.color-yellow { color: #ffc107; font-weight: 500; }
+.color-purple { color: #6f42c1; font-weight: 500; }
+.color-orange { color: #fd7e14; font-weight: 500; }
+.color-pink { color: #e83e8c; font-weight: 500; }
+.color-gray { color: #6c757d; font-weight: 500; }
+
+.color-yellow { color: #ffc107; text-shadow: 1px 1px 1px rgba(0,0,0,0.3); }
+
 </style>
 
 <%- include("partials/footer.ejs") %>

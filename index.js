@@ -8,6 +8,9 @@ import crypto from "crypto";
 import { error } from "console";
 import session from "express-session";
 import nodemailer from "nodemailer";
+import { marked } from 'marked';
+import createDOMPurify from 'dompurify';
+import { JSDOM } from 'jsdom';
 
 dotenv.config();
 
@@ -21,8 +24,16 @@ app.use(
     saveUninitialized: false,
   })
 );
+const window = new JSDOM('').window;
+const DOMPurify = createDOMPurify(window);
 
-const db = new pg.Client({
+// Markdown beállítások
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
+
+const db = new pg.Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
@@ -106,6 +117,35 @@ async function getUserPermissions(username) {
 async function getUserAdminStatus(username) {
   const permissions = await getUserPermissions(username);
   return permissions.isAdmin;
+}
+
+
+function processMarkdown(text) {
+  if (!text) return '';
+  
+  text = text.replace(/\{red\}(.*?)\{\/red\}/g, '<span class="color-red">$1</span>');
+  text = text.replace(/\{blue\}(.*?)\{\/blue\}/g, '<span class="color-blue">$1</span>');
+  text = text.replace(/\{green\}(.*?)\{\/green\}/g, '<span class="color-green">$1</span>');
+  text = text.replace(/\{yellow\}(.*?)\{\/yellow\}/g, '<span class="color-yellow">$1</span>');
+  text = text.replace(/\{purple\}(.*?)\{\/purple\}/g, '<span class="color-purple">$1</span>');
+  text = text.replace(/\{orange\}(.*?)\{\/orange\}/g, '<span class="color-orange">$1</span>');
+  text = text.replace(/\{pink\}(.*?)\{\/pink\}/g, '<span class="color-pink">$1</span>');
+  text = text.replace(/\{gray\}(.*?)\{\/gray\}/g, '<span class="color-gray">$1</span>');
+  
+
+  const rawHtml = marked(text);
+  
+
+  const cleanHtml = DOMPurify.sanitize(rawHtml, {
+    ALLOWED_TAGS: [
+      'p', 'br', 'strong', 'em', 'u', 'del', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'hr', 'table',
+      'thead', 'tbody', 'tr', 'th', 'td', 'span'
+    ],
+    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'class']
+  });
+  
+  return cleanHtml;
 }
 
 app.get("/", (req, res) => {
@@ -315,7 +355,14 @@ async function getThreadsHierarchy(categoryId = null, parentId = null) {
   query += ` ORDER BY t.created_at DESC`;
 
   const result = await db.query(query, params);
-  return result.rows;
+  
+  const processedThreads = result.rows.map(thread => ({
+    ...thread,
+    description_html: processMarkdown(thread.description),
+    description_raw: thread.description
+  }));
+  
+  return processedThreads;
 }
 
 async function getSubthreads(parentId) {
@@ -329,7 +376,14 @@ async function getSubthreads(parentId) {
   `,
     [parentId]
   );
-  return result.rows;
+  
+  const processedThreads = result.rows.map(thread => ({
+    ...thread,
+    description_html: processMarkdown(thread.description),
+    description_raw: thread.description
+  }));
+  
+  return processedThreads;
 }
 
 app.get("/forum", async (req, res) => {
@@ -505,7 +559,12 @@ async function deleteThreadRecursively(threadId) {
 }
 
 app.get("/thread/:id", async (req, res) => {
+  if(!req.session.username) {
+    return res.redirect("/");
+  }
+
   const threadId = req.params.id;
+  let canEdit = false;
 
   try {
     const threadRes = await db.query(
@@ -522,7 +581,16 @@ app.get("/thread/:id", async (req, res) => {
       return res.redirect("/forum");
     }
 
-    const thread = threadRes.rows[0];
+    if (threadRes.rows[0].author == req.session.username) {
+      canEdit = true;
+    }
+    
+    const thread = {
+      ...threadRes.rows[0],
+      description_html: processMarkdown(threadRes.rows[0].description),
+      description_raw: threadRes.rows[0].description
+    };
+    
     const subthreads = await getSubthreads(threadId);
 
     const permissions = await getUserPermissions(req.session.username);
@@ -533,7 +601,25 @@ app.get("/thread/:id", async (req, res) => {
       details: { username: req.session.username },
       isAdmin: permissions.isAdmin,
       canCreateMainThreads: permissions.canCreateMainThreads,
+      canEdit,
     });
+  } catch (err) {
+    console.error(err);
+    res.redirect("/forum");
+  }
+});
+
+app.get("/thread/edit/:id", async (req, res) => {
+  if (!req.session.username) {
+    res.redirect("/");
+  }
+  
+  const threadId = req.params.id;
+  
+  try {
+    const threadRes = await db.query("SELECT * FROM threads WHERE id = $1", [threadId]);
+    console.log(threadRes.rows[0]);
+
   } catch (err) {
     console.error(err);
     res.redirect("/forum");

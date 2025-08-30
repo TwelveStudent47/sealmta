@@ -5,7 +5,9 @@
   <div class="breadcrumb">
     <a href="/forum">← Vissza a fórumra</a>
     <% if (thread.category_name) { %>
-      <span class="category-name" style="margin-left: 10px;">| <%= thread.category_name %></span>
+    <span class="category-name" style="margin-left: 10px"
+      >| <%= thread.category_name %></span
+    >
     <% } %>
   </div>
 
@@ -15,21 +17,31 @@
       <h1><%= thread.title %></h1>
       <div class="thread-meta">
         <span>Szerző: <%= thread.author %></span>
-        <span>| <%= new Date(thread.created_at).toLocaleDateString('hu-HU') %></span>
-        
+        <span
+          >| <%= new Date(thread.created_at).toLocaleDateString('hu-HU')
+          %></span
+        >
+
         <!-- Főtéma törlés gomb -->
         <% if (isAdmin || canCreateMainThreads) { %>
-          <button class="delete-thread-btn" onclick="deleteThread(<%= thread.id %>)" title="Téma törlése">
-            🗑️ Téma törlése
-          </button>
+        <button
+          class="delete-thread-btn"
+          onclick="deleteThread(<%= thread.id %>)"
+          title="Téma törlése"
+        >
+          🗑️ Téma törlése
+        </button>
+        <% } %>
+        <% if (canEdit) { %>
+        <a href="edit/<%= thread.id %>"><button class="delete-thread-btn" style="background-color: #218838;"><i class="ri-pencil-fill"></i> Téma szerkesztése</button></a>
         <% } %>
       </div>
     </div>
-    
-    <% if (thread.description) { %>
-      <div class="thread-description">
-        <p><%= thread.description %></p>
-      </div>
+
+    <% if (thread.description_html) { %>
+    <div class="thread-description markdown-content">
+      <%- thread.description_html %>
+    </div>
     <% } %>
   </div>
 
@@ -44,38 +56,42 @@
   <div class="subthreads-section">
     <h2>Altémák</h2>
     <div class="subthread-list">
-      <% if (subthreads && subthreads.length > 0) { %>
-        <% subthreads.forEach(subthread => { %>
-          <div class="subthread-item">
-            <div class="subthread-info">
-              <a href="/thread/<%= subthread.id %>" class="subthread-title">
-                <%= subthread.title %>
-              </a>
-              <div class="subthread-meta">
-                <span>Szerző: <%= subthread.author %></span>
-                <span>| <%= new Date(subthread.created_at).toLocaleDateString('hu-HU') %></span>
-              </div>
-              <% if (subthread.description) { %>
-                <p class="subthread-description">
-                  <%= subthread.description.substring(0, 150) %>...
-                </p>
-              <% } %>
-            </div>
-            
-            <!-- Altéma törlés gomb -->
-            <% if (isAdmin || canCreateMainThreads) { %>
-              <div class="subthread-actions">
-                <button class="delete-thread-btn" onclick="deleteThread(<%= subthread.id %>)" title="Altéma törlése">
-                  🗑️
-                </button>
-              </div>
-            <% } %>
+      <% if (subthreads && subthreads.length > 0) { %> <%
+      subthreads.forEach(subthread => { %>
+      <div class="subthread-item">
+        <div class="subthread-info">
+          <a href="/thread/<%= subthread.id %>" class="subthread-title">
+            <%= subthread.title %>
+          </a>
+          <div class="subthread-meta">
+            <span>Szerző: <%= subthread.author %></span>
+            <span
+              >| <%= new Date(subthread.created_at).toLocaleDateString('hu-HU')
+              %></span
+            >
           </div>
-        <% }); %>
-      <% } else { %>
-        <div class="no-subthreads">
-          Még nincsenek altémák.
+          <% if (subthread.description_html) { %>
+          <div class="subthread-description markdown-content">
+            <%- subthread.description_html %>
+          </div>
+          <% } %>
         </div>
+
+        <!-- Altéma törlés gomb -->
+        <% if (isAdmin || canCreateMainThreads) { %>
+        <div class="subthread-actions">
+          <button
+            class="delete-thread-btn"
+            onclick="deleteThread(<%= subthread.id %>)"
+            title="Altéma törlése"
+          >
+            🗑️
+          </button>
+        </div>
+        <% } %>
+      </div>
+      <% }); %> <% } else { %>
+      <div class="no-subthreads">Még nincsenek altémák.</div>
       <% } %>
     </div>
   </div>
@@ -86,124 +102,391 @@
   <div class="modal-content">
     <span class="close" onclick="closeCreateModal()">&times;</span>
     <h2>Új altéma létrehozása</h2>
+
+    <!-- Markdown segédlet -->
+    <div class="markdown-help">
+      <details>
+        <summary>📝 Markdown formázás használata</summary>
+        <div class="markdown-guide">
+          <p>
+            <strong>**vastag szöveg**</strong> → <strong>vastag szöveg</strong>
+          </p>
+          <p><em>*dőlt szöveg*</em> → <em>dőlt szöveg</em></p>
+          <p><code>`kód`</code> → <code>kód</code></p>
+          <p># Nagy címsor</p>
+          <p>## Közepes címsor</p>
+          <p>- Lista elem</p>
+          <p>> Idézet</p>
+          <p>[Link szövege](https://example.com)</p>
+          <hr style="margin: 10px 0; border: 1px solid #ddd" />
+          <p><strong>Színes szöveg:</strong></p>
+          <p>
+            {red}piros szöveg{/red} →
+            <span class="color-red">piros szöveg</span>
+          </p>
+          <p>
+            {blue}kék szöveg{/blue} → <span class="color-blue">kék szöveg</span>
+          </p>
+          <p>
+            {green}zöld szöveg{/green} →
+            <span class="color-green">zöld szöveg</span>
+          </p>
+          <p>
+            {yellow}sárga szöveg{/yellow} →
+            <span class="color-yellow">sárga szöveg</span>
+          </p>
+          <p>
+            {purple}lila szöveg{/purple} →
+            <span class="color-purple">lila szöveg</span>
+          </p>
+          <p>
+            {orange}narancs szöveg{/orange} →
+            <span class="color-orange">narancs szöveg</span>
+          </p>
+          <p>
+            {pink}rózsaszín szöveg{/pink} →
+            <span class="color-pink">rózsaszín szöveg</span>
+          </p>
+          <p>
+            {gray}szürke szöveg{/gray} →
+            <span class="color-gray">szürke szöveg</span>
+          </p>
+        </div>
+      </details>
+    </div>
+
     <form method="POST" action="/create-thread">
-      <input type="hidden" name="parentId" value="<%= thread.id %>">
-      <input type="hidden" name="categoryId" value="<%= thread.category_id %>">
-      
+      <input type="hidden" name="parentId" value="<%= thread.id %>" />
+      <input
+        type="hidden"
+        name="categoryId"
+        value="<%= thread.category_id %>"
+      />
+
       <div class="form-group">
         <label for="title">Altéma címe:</label>
-        <input type="text" id="title" name="title" required>
+        <input type="text" id="title" name="title" required />
       </div>
-      
+
       <div class="form-group">
-        <label for="description">Leírás:</label>
-        <textarea id="description" name="description" placeholder="Rövid leírás az altémáról..."></textarea>
+        <label for="description">Leírás (Markdown támogatott):</label>
+        <textarea
+          id="description"
+          name="description"
+          placeholder="Rövid leírás az altémáról...
+
+Használhatsz **vastag**, *dőlt* szöveget, és egyéb formázást!"
+        ></textarea>
       </div>
-      
+
       <button type="submit" class="submit-btn">Altéma létrehozása</button>
     </form>
   </div>
 </div>
 
 <script>
-// Modal kezelés
-function openCreateModal() {
-  document.getElementById('createModal').style.display = 'block';
-}
+  // Modal kezelés
+  function openCreateModal() {
+    document.getElementById('createModal').style.display = 'block';
+  }
 
-function closeCreateModal() {
-  document.getElementById('createModal').style.display = 'none';
-}
+  function closeCreateModal() {
+    document.getElementById('createModal').style.display = 'none';
+  }
 
-// Téma/altéma törlés
-<% if (isAdmin || canCreateMainThreads) { %>
-async function deleteThread(threadId) {
-  const isMainThread = threadId == <%= thread.id %>;
-  const confirmMessage = isMainThread 
-    ? 'Biztosan törölni szeretnéd ezt a főtémát? Ez a művelet nem visszavonható és az összes altémát is törli!'
-    : 'Biztosan törölni szeretnéd ezt az altémát? Ez a művelet nem visszavonható!';
-  
-  if (confirm(confirmMessage)) {
-    try {
-      const response = await fetch(`/delete-thread/${threadId}`, {
-        method: 'DELETE'
-      });
+  // Téma/altéma törlés
+  <% if (isAdmin || canCreateMainThreads) { %>
+  async function deleteThread(threadId) {
+    const isMainThread = threadId == <%= thread.id %>;
+    const confirmMessage = isMainThread
+      ? 'Biztosan törölni szeretnéd ezt a főtémát? Ez a művelet nem visszavonható és az összes altémát is törli!'
+      : 'Biztosan törölni szeretnéd ezt az altémát? Ez a művelet nem visszavonható!';
 
-      const result = await response.json();
+    if (confirm(confirmMessage)) {
+      try {
+        const response = await fetch(`/delete-thread/${threadId}`, {
+          method: 'DELETE'
+        });
 
-      if (result.success) {
-        alert('Téma sikeresen törölve!');
-        if (isMainThread) {
-          // Ha a főtémát töröltük, visszairányítás a fórumra
-          window.location.href = '/forum';
+        const result = await response.json();
+
+        if (result.success) {
+          alert('Téma sikeresen törölve!');
+          if (isMainThread) {
+            // Ha a főtémát töröltük, visszairányítás a fórumra
+            window.location.href = '/forum';
+          } else {
+            // Ha altémát töröltük, oldal újratöltése
+            window.location.reload();
+          }
         } else {
-          // Ha altémát töröltük, oldal újratöltése
-          window.location.reload();
+          alert('Hiba: ' + result.error);
         }
-      } else {
-        alert('Hiba: ' + result.error);
+      } catch (error) {
+        console.error('Hiba:', error);
+        alert('Hiba történt a téma törlése során.');
       }
-    } catch (error) {
-      console.error('Hiba:', error);
-      alert('Hiba történt a téma törlése során.');
     }
   }
-}
-<% } %>
+  <% } %>
 
-// Modal bezárás kattintásra
-window.onclick = function(event) {
-  const modal = document.getElementById('createModal');
-  if (event.target == modal) {
-    closeCreateModal();
+  // Modal bezárás kattintásra
+  window.onclick = function(event) {
+    const modal = document.getElementById('createModal');
+    if (event.target == modal) {
+      closeCreateModal();
+    }
   }
-}
 </script>
 
 <style>
-
-.subthread-actions {
-  margin-left: 15px;
-}
-
-.delete-thread-btn {
-  background: none;
-  border: none;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 5px 10px;
-  border-radius: 3px;
-  transition: background-color 0.3s;
-  color: #dc3545;
-}
-
-.delete-thread-btn:hover {
-  background-color: #dc3545;
-  color: white;
-}
-
-
-@media (max-width: 768px) {
-  .container {
-    padding: 10px;
+  .thread-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
   }
-  
-  .thread-header {
-    flex-direction: column;
-    gap: 10px;
+
+  .navigation {
+    margin-bottom: 20px;
   }
-  
+
+  .back-btn {
+    display: inline-block;
+    margin-right: 15px;
+    padding: 8px 15px;
+    background-color: #f8f9fa;
+    color: #007bff;
+    text-decoration: none;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+  }
+
+  .back-btn:hover {
+    background-color: #e9ecef;
+  }
+
+  .main-thread {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .main-thread h1 {
+    margin: 0 0 10px 0;
+    color: #333;
+  }
+
+  .thread-meta,
+  .subthread-meta {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 15px;
+  }
+
+  .thread-category {
+    background-color: #007bff;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-left: 10px;
+  }
+
+  .thread-content {
+    margin-top: 15px;
+    line-height: 1.6;
+  }
+
+  .create-subthread-section {
+    margin: 30px 0;
+    text-align: center;
+  }
+
+  .create-subthread-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  .create-subthread-btn:hover {
+    background-color: #218838;
+  }
+
+  .subthreads-section h2 {
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+  }
+
+  .subthread-list {
+    space-y: 15px;
+  }
+
   .subthread-item {
-    flex-direction: column;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
     align-items: flex-start;
-    gap: 10px;
   }
-  
-  .subthread-actions {
-    margin-left: 0;
-    align-self: flex-end;
-  }
-}
-</style>
 
-<%- include("partials/footer.ejs") %>
+  .subthread-info {
+    flex: 1;
+  }
+
+  .subthread-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #007bff;
+    text-decoration: none;
+  }
+
+  .subthread-title:hover {
+    text-decoration: underline;
+  }
+
+  .subthread-description {
+    margin-top: 10px;
+    color: #555;
+    max-height: 100px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .subthread-actions,
+  .thread-actions {
+    margin-left: 15px;
+  }
+
+  .delete-thread-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .delete-thread-btn:hover {
+    background-color: #c82333;
+  }
+
+  .no-subthreads {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 40px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+  }
+
+  /* Modal stílusok */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border: none;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .close:hover {
+    color: #000;
+  }
+
+  .form-group {
+    margin-bottom: 15px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .form-group textarea {
+    height: 120px;
+    resize: vertical;
+  }
+  /* Színes szöveg osztályok */
+  .color-red {
+    color: #dc3545;
+    font-weight: 500;
+  }
+  .color-blue {
+    color: #007bff;
+    font-weight: 500;
+  }
+  .color-green {
+    color: #28a745;
+    font-weight: 500;
+  }
+  .color-yellow {
+    color: #ffc107;
+    font-weight: 500;
+  }
+  .color-purple {
+    color: #6f42c1;
+    font-weight: 500;
+  }
+  .color-orange {
+    color: #fd7e14;
+    font-weight: 500;
+  }
+  .color-pink {
+    color: #e83e8c;
+    font-weight: 500;
+  }
+  .color-gray {
+    color: #6c757d;
+    font-weight: 500;
+  }
+
+  /* Sötét háttérrel kombinálva is jól látható */
+  .color-yellow {
+    color: #ffc107;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+  }
+</style>
